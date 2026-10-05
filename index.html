@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EvoHarness-RL &mdash; Learning Runtime Harness Coordination for Self-Evolving Agents</title>
+<meta name="description" content="EvoHarness-RL unifies heterogeneous agent harnesses into a Belief-Progress-Experience (BPE) workspace and learns when and how to coordinate with it through cost-aware GRPO.">
+<meta property="og:title" content="EvoHarness-RL: Learning Runtime Harness Coordination for Self-Evolving Agents">
+<meta property="og:description" content="A shared BPE harness interface + cost-aware RL: +10.0 pts for frontier models without training, +8.5 pts over the strongest open-source baseline.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="static/figure_1_new.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="wrap">
+    <span class="mark">EvoHarness<span>-RL</span></span>
+    <span class="links">
+      <a href="#overview">Overview</a>
+      <a href="#bpe">BPE Workflow</a>
+      <a href="#protocol">Action Protocol</a>
+      <a href="#findings">RL Findings</a>
+      <a href="#internalization">Analysis</a>
+      <a href="#results">Results</a>
+      <a href="#bibtex">BibTeX</a>
+    </span>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap">
+    <span class="badge"><span class="dot"></span>Preprint &middot; 2026</span>
+
+    <h1 class="title"><span class="accent">EvoHarness-RL</span>
+      <span class="sub">Learning Runtime Harness Coordination for Self-Evolving Agents</span></h1>
+
+    <p class="authors">
+      <span class="au">Xuying Ning<sup>1</sup>,</span>
+      <span class="au">Dongqi Fu<sup>2</sup>,</span>
+      <span class="au">Tianxin Wei<sup>1</sup>,</span>
+      <span class="au">Hanqing Zeng<sup>2</sup>,</span>
+      <span class="au">Yuanchen Bei<sup>1</sup>,</span>
+      <span class="au">Bingxuan Li<sup>1</sup>,</span>
+      <span class="au">Zihao Li<sup>1</sup>,</span>
+      <span class="au">Qifan Wang<sup>2</sup>,</span>
+      <span class="au">Xiang Shen<sup>2</sup>,</span>
+      <span class="au">Yifan Wu<sup>2</sup>,</span>
+      <span class="au">Jiayi Liu<sup>2</sup>,</span>
+      <span class="au">Hong Li<sup>2</sup>,</span>
+      <span class="au">Yinglong Xia<sup>2</sup>,</span>
+      <span class="au">Xiangjun Fan<sup>2</sup>,</span>
+      <span class="au">Hanghang Tong<sup>1</sup>,</span>
+      <span class="au">Jingrui He<sup>1</sup></span>
+    </p>
+    <p class="affil">
+      <span class="au"><sup>1</sup>University of Illinois Urbana-Champaign</span>
+      <span class="au"><sup>2</sup>Meta AI</span>
+    </p>
+
+    <div class="logos">
+      <img src="static/logo-uiuc.svg" alt="University of Illinois Urbana-Champaign">
+      <img src="static/logo-meta.svg" alt="Meta">
+    </div>
+
+    <div class="buttons">
+      <!-- TODO: replace href="#" with real links and drop the "soon" class -->
+      <a class="btn soon" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Paper (soon)</a>
+      <a class="btn soon" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9l4 3-4 3M13 15h3"/></svg>arXiv (soon)</a>
+      <a class="btn soon" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.82 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>Code (soon)</a>
+      <a class="btn ghost" href="#bibtex"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h4v4H7zM13 7h4v4h-4z"/><path d="M7 11c0 3-1 5-3 6M13 11c0 3-1 5-3 6"/></svg>BibTeX</a>
+    </div>
+
+    <div class="teaser reveal">
+      <div class="figure">
+        <img src="static/figure_1_new.png" alt="Overview of EvoHarness-RL: heterogeneous harness designs unified into a Belief-Progress-Experience workspace with four agent-harness actions.">
+      </div>
+      <p class="caption"><span class="fignum">Fig. 1</span>
+        Heterogeneous, hand-designed harnesses are unified into one <b>BPE</b> workspace &mdash; <i>Belief</i>, <i>Progress</i>,
+        <i>Experience</i> &mdash; and the agent learns when to call four actions: <code>track</code>, <code>commit</code>,
+        <code>recall</code>, <code>note</code>.</p>
+    </div>
+  </div>
+</header>
+
+<div class="statband">
+  <div class="wrap">
+    <div class="stats reveal">
+      <div class="stat">
+        <div class="lbl">Frontier models, no training</div>
+        <div class="k">+10.0</div>
+        <div class="t">pts avg. success with <b>EvoHarness-Base</b> across Claude, GLM, and GPT.</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Learned coordination</div>
+        <div class="k">+8.5</div>
+        <div class="t">pts avg. success over the strongest open-source trainable baseline.</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Rollout efficiency</div>
+        <div class="k">2.9&times;</div>
+        <div class="t">fewer GRPO steps to reach 93% validation success vs. SFT&nbsp;+&nbsp;GRPO.</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Harness annealing</div>
+        <div class="k">9.0&rarr;3.0</div>
+        <div class="t">harness calls / episode on ALFWorld (SFT&rarr;RL) while success rises 68.6&rarr;95.0%.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<!-- ============ 01 OVERVIEW ============ -->
+<section id="overview">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="no">01</span><h2>Overview</h2></div>
+    <p class="lead">Long-horizon agents depend on an external <b>harness</b> &mdash; memories, state trackers, planners, verifiers.
+      Today each harness is hand-built for one environment and driven by fixed rules, so the agent and its harness are never
+      optimized together.</p>
+    <div class="question">Can heterogeneous, task-specific harnesses be unified into one interface &mdash; and can the agent <i>learn</i> when to use it?</div>
+
+    <h3 style="margin-top:34px">Key insights</h3>
+    <div class="insights">
+      <a class="insight" href="#bpe">
+        <div class="hd"><span class="num">1</span>One BPE workflow for every dataset</div>
+        <p>Belief / Progress / Experience defines <i>roles</i>, not implementations. A thin environment adapter grounds them in
+          ALFWorld, WebShop, and WebArena; the policy always sees the same interface.</p>
+        <span class="metric">frontier models +10.0 pts, zero training</span>
+      </a>
+      <a class="insight" href="#protocol">
+        <div class="hd"><span class="num">2</span>Harness use is an on-the-fly action</div>
+        <p>Four meta-actions share the action space and step budget with environment actions. The policy decides <i>at each step</i>
+          whether to read or write external state.</p>
+        <span class="metric">A = A<sub>env</sub> &cup; {track, commit, recall, note}</span>
+      </a>
+      <a class="insight" href="#findings">
+        <div class="hd"><span class="num">3</span>Two findings about RL with a scaffold</div>
+        <p><b>(a)</b> The BPE scaffold makes GRPO find successful rollouts faster.
+          <b>(b)</b> Early diversity / exploration prevents premature pruning and lets RL converge to a better coordination rule.</p>
+        <span class="metric">2.2&times; / 1.6&times; / 2.9&times; faster &middot; w/o diversity &minus;2.1</span>
+      </a>
+      <a class="insight" href="#internalization">
+        <div class="hd"><span class="num">4</span>Internalization &rarr; harness annealing</div>
+        <p>Repeated patterns the scaffold provides get absorbed into the policy through RL, so harness calls drop while success
+          keeps rising. What remains external is what is genuinely hard to internalize.</p>
+        <span class="metric">calls &minus;67% / &minus;83% / &minus;15%, success &uarr;</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 UNIFIED BPE ============ -->
+<section id="bpe" class="alt">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-head"><span class="no">02</span><h2>One BPE workflow, every environment</h2></div>
+      <p class="lead">Instead of a new harness per benchmark, every environment plugs into the same three-role workspace
+        $\mathcal{H}_t = (B_t, P_t, E_t)$. Only the adapter changes.</p>
+
+      <div class="flow">
+        <div class="node"><div class="t">Environment</div><div class="v">ALFWorld &middot; WebShop &middot; WebArena</div></div>
+        <div class="arr">&rarr;</div>
+        <div class="node"><div class="t">Env. adapter</div><div class="v">grounds roles from agent-visible observations</div></div>
+        <div class="arr">&rarr;</div>
+        <div class="node hl"><div class="t">Shared interface</div><div class="v">Belief &middot; Progress &middot; Experience</div></div>
+        <div class="arr">&rarr;</div>
+        <div class="node"><div class="t">Policy</div><div class="v">same 4 actions, any environment</div></div>
+      </div>
+
+      <div class="grid-bpe">
+        <div class="h">Role</div><div class="h">ALFWorld</div><div class="h">WebShop</div><div class="h">WebArena</div>
+
+        <div class="r b">Belief<small>what the agent believes &middot; in-episode</small></div>
+        <div>Object states, locations, receptacle relations, inventory</div>
+        <div>Request constraints &amp; compared candidates across pages</div>
+        <div>Current page, navigation trail, active controls, past values</div>
+
+        <div class="r p">Progress<small>how the task is going &middot; in-episode</small></div>
+        <div>Bounded record of manipulation subgoals</div>
+        <div>Which product requirements are resolved / unverified</div>
+        <div>Completed vs. pending requirements across pages</div>
+
+        <div class="r e">Experience<small>what can be reused &middot; cross-episode</small></div>
+        <div class="span">General principles + task-specific procedures &amp; failure patterns, maintained by a
+          <b>solver&ndash;evolver</b> loop (<span class="sc">Add / Update / Archive / Skip</span>) &mdash; identical structure in all three.</div>
+      </div>
+      <p class="muted small">No variant sees privileged environment state; all content is derived from normal agent interaction.</p>
+
+      <div class="callout">
+        <div class="big">+10.0</div>
+        <p>Plugging BPE in as an always-on scaffold (<b>EvoHarness-Base</b>) already lifts Claude Opus 4.6, GLM-5, and GPT-5 by
+          10.0 pts on average with no parameter updates &mdash; while hand-designed memory baselines on Qwen3-8B are mixed or
+          even negative across environments.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 ACTION PROTOCOL ============ -->
+<section id="protocol">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-head"><span class="no">03</span><h2>Action protocol: using the harness on the fly</h2></div>
+      <p class="lead">Always-on BPE fixes what lives outside the model. EvoHarness-RL instead turns every harness access into a
+        policy decision, made step by step during the rollout.</p>
+
+      <div class="rules">
+        <div class="rule"><span class="s">STEP t</span><h4>One action, joint space</h4>
+          <p>$a_t \sim \pi_\theta(\cdot \mid o_t, \mathcal{V}_t, c_t)$ over $\mathcal{A}_{\mathrm{env}} \cup \mathcal{A}_{\mathrm{bpe}}$.</p></div>
+        <div class="rule"><span class="s">IF ENV</span><h4>Advance the world</h4>
+          <p>The environment steps; adapters silently update Belief / Progress stores in the background.</p></div>
+        <div class="rule"><span class="s">IF BPE</span><h4>Read / write, then refresh $\mathcal{V}_t$</h4>
+          <p>The call costs <b>one step</b> of the same budget &mdash; so it must be worth it.</p></div>
+      </div>
+    </div>
+
+    <div class="actions reveal">
+      <div class="act"><div class="top"><span class="op b">track</span><span class="rw">READ &middot; B</span></div>
+        <p>Selective read of Belief, e.g. <code>[object]</code>, <code>[price]</code>, <code>[candidates]</code>, earlier page values.</p></div>
+      <div class="act"><div class="top"><span class="op p">commit</span><span class="rw">WRITE &middot; P</span></div>
+        <p>Write the current subgoal to Progress; returns the updated done / remaining plan.</p></div>
+      <div class="act"><div class="top"><span class="op e">recall</span><span class="rw">READ &middot; E</span></div>
+        <p>Query Experience for relevant principles, procedures, known mistakes, or search hints.</p></div>
+      <div class="act"><div class="top"><span class="op e">note</span><span class="rw">PROPOSE &middot; E</span></div>
+        <p>Flag a discovery or a contradiction to recalled Experience; buffered and consolidated only at epoch end.</p></div>
+    </div>
+
+    <div class="reveal" style="margin-top:22px">
+      <p class="muted small" style="margin-bottom:4px"><b>Illustrative ALFWorld trace</b> &mdash; &ldquo;put two tissue boxes on the dining table&rdquo; (adapted from the paper&rsquo;s appendix example).</p>
+      <div class="trace">
+        <div class="ln"><span class="t">&hellip;</span><span class="k env">ENV</span><span>take tissuebox 2 from coffeetable 1</span></div>
+        <div class="ln"><span class="t"></span><span class="k bpe">BPE</span><span>track [tissuebox]</span></div>
+        <div class="ln"><span class="t"></span><span></span><span class="ret">tissuebox 1 on diningtable 1 · tissuebox 2 held_by agent · tissuebox 3 on coffeetable 1 · searched: diningtable 1, coffeetable 1</span></div>
+        <div class="ln"><span class="t"></span><span class="k bpe">BPE</span><span>commit [place held box on diningtable 1, then verify two distinct boxes]</span></div>
+        <div class="ln"><span class="t"></span><span></span><span class="ret">✓ place first box  ✓ pick up second box  ☐ place + verify count</span></div>
+        <div class="ln"><span class="t"></span><span class="k bpe">BPE</span><span>recall [pick two]</span></div>
+        <div class="ln"><span class="t"></span><span></span><span class="ret">Do not treat the first placement as completion of a two-object goal; verify each new relation.</span></div>
+        <div class="ln"><span class="t"></span><span class="k env">ENV</span><span>go to diningtable 1</span></div>
+        <div class="ln"><span class="t"></span><span class="k env">ENV</span><span>put tissuebox 2 in/on diningtable 1</span></div>
+        <div class="ln"><span class="t"></span><span class="k bpe">BPE</span><span>note [tissue boxes often on coffee tables; verify after each placement]</span></div>
+        <div class="ln"><span class="t"></span><span></span><span class="ret">buffered &rarr; evolver decides Add / Update / Archive / Skip after the rollout batch</span></div>
+      </div>
+      <p class="muted small">The observation alone no longer says where box 1 went or which receptacles were searched &mdash; Belief keeps it,
+        Progress keeps the &ldquo;two boxes&rdquo; constraint explicit, Experience supplies the reusable check.</p>
+    </div>
+
+    <div class="reveal">
+      <h3>Learning <i>how</i>, then <i>when</i></h3>
+      <div class="recipe">
+        <div class="panel"><span class="tag">Stage 1 &middot; How</span><h4>Supervised initialization</h4>
+          <p>Teacher trajectories that interleave env actions with BPE calls teach the syntax and semantics of each action.
+            Without it, RL cannot explore the new action space from sparse reward (ALFWorld 95.0 &rarr; 50.0).</p></div>
+        <div class="panel"><span class="tag">Stage 2 &middot; When</span><h4>Cost-aware GRPO</h4>
+          <p>RL compares coordination strategies and keeps only the calls worth their step cost, instead of copying the teacher&rsquo;s pattern.</p></div>
+      </div>
+      <div class="eqbox">$R(\tau;u) = R_{\mathrm{GRPO}}(\tau) + \underbrace{\lambda_{\mathrm{div}}(u)\,R_{\mathrm{div}}(\tau)}_{\text{explore (annealed)}} + \underbrace{\lambda_{\mathrm{eff}}\,R_{\mathrm{eff}}(\tau)}_{\text{specialize}}$</div>
+      <p class="muted small">$R_{\mathrm{div}}$: fraction of BPE action types used in $\tau$, with a cosine weight that reaches 0 at horizon $U$.
+        $R_{\mathrm{eff}} = \mathbf{1}[\mathrm{succ}]\,(T_{\max}-|\tau|)/T_{\max}$: shorter successful trajectories win, so a redundant harness call
+        costs the same as a redundant env action.</p>
+      <details class="why"><summary>Training pipeline figure</summary>
+        <div class="body"><div class="figure" style="margin-top:6px"><img src="static/figure_2_new.png" alt="Training pipeline: GRPO rollouts interleave environment actions with BPE meta-actions; composite reward of base, exploration, and specialization terms."></div>
+          <p class="caption"><span class="fignum">Fig. 2</span>Rollouts interleave environment actions with BPE meta-actions; GRPO uses the base reward plus an annealed exploration bonus and an efficiency incentive.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 RL FINDINGS ============ -->
+<section id="findings" class="alt">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-head"><span class="no">04</span><h2>Two findings about RL with a harness</h2></div>
+    </div>
+
+    <div class="finding reveal">
+      <div class="text">
+        <span class="kicker">Finding A</span>
+        <h3>The scaffold makes GRPO rollout-efficient</h3>
+        <p class="claim">Externalized state, progress, and experience let GRPO discover successful trajectories earlier, so each rollout
+          batch carries more learning signal.</p>
+        <ul class="pts">
+          <li>Same supervised-data budget: reaches 85 / 90 / 93% validation success in
+            <b>2.2&times; / 1.6&times; / 2.9&times;</b> fewer GRPO steps than vanilla SFT&nbsp;+&nbsp;GRPO.</li>
+          <li>It <b>starts lower</b> (57.8 vs. 79.7%) &mdash; it must also learn four new actions &mdash; then overtakes. The gain is
+            not from a stronger SFT checkpoint.</li>
+          <li>Versus plain GRPO: hits 80% training success by step 19 and averages <b>~23 pts</b> higher over the last 10 steps.</li>
+        </ul>
+        <details class="why"><summary>Why: conditional rollout-efficiency bound</summary>
+          <div class="body">
+            <p>If BPE returns decision-relevant information used with bounded error, the rollouts needed to find a success with prob. $\ge 1-\rho$ satisfy</p>
+            $$N_{\mathrm{BPE}}(x) \le \Bigl\lceil \tfrac{1}{1+\alpha(x)/p_0(x)}\, N_{\mathrm{base}}(x)\Bigr\rceil,$$
+            <p>where $p_0$ is the baseline success probability and $\alpha>0$ the net benefit of BPE information &mdash; largest when $p_0$ is small.</p>
+          </div>
+        </details>
+      </div>
+      <div class="figcol">
+        <div class="figure"><img src="static/sample_efficiency_thresholds_horizontal.png" alt="GRPO steps to validation threshold: EvoHarness-RL vs SFT+GRPO."></div>
+        <p class="caption"><span class="fignum">Fig. 3</span>GRPO steps to reach ALFWorld validation-success thresholds (evaluated every 5 steps), same supervised-data budget.</p>
+      </div>
+    </div>
+
+    <div class="finding stack reveal">
+      <div class="text">
+        <span class="kicker">Finding B</span>
+        <h3>Diversity &amp; exploration let RL converge to a better coordination rule</h3>
+        <p class="claim">Efficiency pressure alone prunes new harness actions before their value is discovered. A transient diversity
+          bonus keeps strategies alive early, then anneals away so efficiency can specialize them.</p>
+      </div>
+      <div class="figcol wide">
+        <div class="figure"><img src="static/harness_action_reward_ablation.png" alt="Harness-action dynamics under full reward, without diversity, and without efficiency."></div>
+        <p class="caption"><span class="fignum">Fig. 4</span>Per-action harness use under different rewards. Without diversity, use anneals too early; without efficiency, it stays high late in training.</p>
+      </div>
+      <div class="two-col" style="margin:4px 0 0">
+        <ul class="pts" style="margin:0">
+          <li><b>w/o diversity</b>: harness use collapses early &mdash; <i>premature pruning</i>, not specialization. ALFWorld 95.0 &rarr; <b>92.9</b>.</li>
+          <li><b>w/o efficiency</b>: calls stay high late in training; nothing separates useful from redundant calls. 95.0 &rarr; <b>86.4</b>.</li>
+        </ul>
+        <ul class="pts" style="margin:0">
+          <li><b>Complementary in time</b>: diversity broadens early exploration; efficiency converts it into selective use.</li>
+          <li><code>note</code> peaks early to bootstrap an empty Experience bank, then fades &mdash; its distilled knowledge keeps being recalled.</li>
+        </ul>
+      </div>
+      <details class="why"><summary>Why the bonus doesn&rsquo;t bias the final policy: convergence with diversity annealing</summary>
+        <div class="body">
+          <p>With $\mathcal{B}^*$ the optimal coordination rules and $\Delta_J$ the gap to the best non-optimal rule,</p>
+          $$J^* - J(\mu_u) \le \varepsilon_{\mathrm{opt}}(u) + \lambda_u, \qquad \Pr(b\in\mathcal{B}^*) \ge 1 - \tfrac{\varepsilon_{\mathrm{opt}}(u)+\lambda_u}{\Delta_J}.$$
+          <p>Since $\lambda_u = 0$ for $u \ge U$, retained harness use is ultimately decided only by task reward, efficiency, and optimization error.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 ANALYSIS 1: INTERNALIZATION ============ -->
+<section id="internalization" class="ana">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-head"><span class="no">05</span><h2>Analysis</h2></div>
+      <p class="lead">How training reshapes the division of labor between the model and its harness &mdash; five findings, one at a time.</p>
+    </div>
+
+    <div class="reveal" style="margin-top:34px">
+      <div class="ana-head"><span class="kick"><span class="pill">Analysis 1</span></span>
+        <h2>Internalization &amp; harness annealing</h2></div>
+      <p class="claim">The scaffold&rsquo;s <b>repeated patterns get absorbed into the policy</b> by RL. On ALFWorld, mean harness calls
+        fall from ~5 to ~1 while success keeps rising &mdash; the harness is kept only for what is still worth externalizing.</p>
+    </div>
+    <div class="finding reveal">
+      <div class="text">
+        <div class="phases v">
+          <div class="phase"><span class="mk m1"></span><div><span class="s">Phase 1</span><h4>Early explore</h4>
+            <p>Broad reliance on BPE to stabilize long-horizon execution; every action gets tried.</p></div></div>
+          <div class="phase"><span class="mk m2"></span><div><span class="s">Phase 2</span><h4>Annealing</h4>
+            <p>Recurring routines move inside the model; routine calls are pruned while success rises.</p></div></div>
+          <div class="phase"><span class="mk m3"></span><div><span class="s">Phase 3</span><h4>Stable</h4>
+            <p>Calls plateau above zero &mdash; what remains is genuinely useful outside the model.</p></div></div>
+        </div>
+        <ul class="pts">
+          <li>Not just fewer calls: perturbing the learned <b>choice and timing</b> hurts even at matched frequency.</li>
+          <li>Always-on BPE (no learned annealing) trails EvoHarness-RL by <b>6.4 pts</b>.</li>
+        </ul>
+      </div>
+      <div class="figcol narrow">
+        <div class="figure"><img src="static/harness_calls_by_phase.png" alt="Mean harness calls over ALFWorld training: early explore, annealing, and stable phases."></div>
+        <p class="caption"><span class="fignum">Fig. 5</span>Mean harness calls during ALFWorld GRPO training, split into early-explore, annealing, and stable phases.</p>
+      </div>
+    </div>
+    <details class="why reveal"><summary>Per-action breakdown across all three environments</summary>
+      <div class="body"><div class="figure" style="margin-top:6px"><img src="static/harness_action_distributions_three_datasets.png" alt="Per-action harness use declines while success rate rises in ALFWorld, WebShop, and WebArena."></div>
+        <p>Each action anneals at its own rate while success (dashed) rises; the internal/external boundary differs by environment.</p></div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ ANALYSIS 2: HOW THEN WHEN ============ -->
+<section id="how-when" data-nav="internalization" class="ana alt">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ana-head"><span class="kick"><span class="pill">Analysis 2</span></span>
+        <h2>SFT teaches <i>how</i>; RL teaches <i>when</i></h2></div>
+      <p class="claim">Harness use rises with SFT, then falls with RL &mdash; while success rises at both stages, on every benchmark.</p>
+    </div>
+    <div class="stages reveal">
+      <div class="stage"><span class="s">Base</span><h4>Interface exists, unused</h4>
+        <p>Prompting alone: the pretrained policy barely calls BPE.</p>
+        <span class="n">ALFWorld 1.96 calls &middot; 52.1%</span></div>
+      <div class="stage"><span class="s">SFT &middot; learn how</span><h4>Heavy scaffold reliance</h4>
+        <p>Imitation teaches the actions &mdash; and copies the teacher&rsquo;s heavy call pattern.</p>
+        <span class="n">ALFWorld 9.03 calls &middot; 68.6%</span></div>
+      <div class="stage"><span class="s">RL &middot; learn when</span><h4>Selective coordination</h4>
+        <p>Redundant calls pruned; task-relevant support retained.</p>
+        <span class="n">ALFWorld 2.98 calls &middot; 95.0%</span></div>
+    </div>
+    <div class="figcol wide reveal">
+      <div class="figure"><img src="static/harness_usage_three_benchmarks.png" alt="Harness calls per episode and success rate for Base, SFT, and EvoHarness-RL across three benchmarks."></div>
+      <p class="caption"><span class="fignum">Fig. 6</span>Harness calls per test episode (bars) and test success (line). SFT &rarr; RL: calls 9.03&rarr;2.98 (ALFWorld),
+        6.87&rarr;1.15 (WebShop), 2.00&rarr;1.70 (WebArena); success 68.6&rarr;95.0, 43.8&rarr;80.6, 16.0&rarr;26.0.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANALYSIS 3: ENV-DEPENDENT ============ -->
+<section id="specialization" data-nav="internalization" class="ana">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ana-head"><span class="kick"><span class="pill">Analysis 3</span></span>
+        <h2>Coordination specializes to the environment</h2></div>
+      <p class="claim">Harness use drops everywhere, but the same recipe <b>keeps different actions</b> depending on task structure.</p>
+    </div>
+    <div class="finding reveal">
+      <div class="text">
+        <ul class="pts">
+          <li><b>ALFWorld</b> &mdash; recurring household routines &rarr; reusable experience matters: <code>recall</code> is 92% of final calls.</li>
+          <li><b>WebShop</b> &mdash; a fresh constraint combination every episode &rarr; keep the current request: <code>track</code> is 89%.</li>
+          <li><b>WebArena</b> &mdash; long workflows with shifting subgoals &rarr; no single state suffices: mixed, led by <code>commit</code>.</li>
+          <li>Total calls fall 66&ndash;75% while training success rises 60&ndash;83%.</li>
+        </ul>
+      </div>
+      <div class="figcol">
+        <div class="figure"><img src="static/adaptive_meta_action_composition_new.png" alt="Early vs final meta-action composition across ALFWorld, WebShop, WebArena."></div>
+        <p class="caption"><span class="fignum">Fig. 7</span>Early vs. final meta-action composition. $H$ = harness actions per episode, SR = training success rate.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANALYSIS 4: TRANSFER ============ -->
+<section id="transfer" data-nav="internalization" class="ana alt">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ana-head"><span class="kick"><span class="pill">Analysis 4</span></span>
+        <h2>The coordination rule transfers across domains</h2></div>
+      <p class="claim">Initialize ALFWorld training from a <b>WebShop</b>-trained checkpoint and adapt for 100 steps.</p>
+    </div>
+    <div class="finding reveal">
+      <div class="text">
+        <ul class="pts">
+          <li><b>EvoHarness-RL transfer</b> adapts fast and approaches the in-domain policy on both training and validation.</li>
+          <li><b>GRPO transfer</b> shows strong negative transfer: training partly recovers, validation stays far lower.</li>
+          <li>Dropping target-side SFT also hurts &mdash; interface initialization still helps adaptation.</li>
+          <li>What transfers is <i>when to externalize</i>, not a fixed action mix &mdash; the two domains end with very different mixes (Analysis 3).</li>
+        </ul>
+      </div>
+      <div class="figcol">
+        <div class="figure"><img src="static/transfer_webshop_to_alfworld.png" alt="Cross-domain adaptation from WebShop to ALFWorld: training and validation success."></div>
+        <p class="caption"><span class="fignum">Fig. 8</span>WebShop &rarr; ALFWorld adaptation over 100 target-domain steps. Left: training success; right: validation success.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANALYSIS 5: HARNESS EVOLUTION ============ -->
+<section id="evolution" data-nav="internalization" class="ana">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="ana-head"><span class="kick"><span class="pill">Analysis 5</span></span>
+        <h2>The harness evolves with the policy</h2></div>
+      <p class="claim">Experience is continually maintained, not append-only: it moves from <b>acquisition to refinement</b>.</p>
+    </div>
+    <div class="finding reveal">
+      <div class="text">
+        <ul class="pts">
+          <li>Early cycles are dominated by <span class="sc">Add</span>; as the bank fills, <span class="sc">Update</span> takes over to fix stale or conflicting entries.</li>
+          <li>Co-evolving beats a fixed bank, most on <b>unseen</b> tasks (94.8 vs. 86.6).</li>
+          <li>Self-consolidation by Qwen3-8B itself works without a frontier consolidator.</li>
+        </ul>
+        <div class="tablewrap"><table class="res compact" id="exp-table"></table></div>
+        <p class="tcap" style="margin:0">ALFWorld avg. success (%) of separately trained Experience variants.</p>
+      </div>
+      <div class="figcol narrow">
+        <div class="figure"><img src="static/skill_evolution_with_evolver_mix_gray_gold_opus_1886335.png" alt="Experience-bank composition and evolver operations over consolidation cycles."></div>
+        <p class="caption"><span class="fignum">Fig. 9</span>Experience-bank composition (bars) and evolver Add / Update operations (lines) over consolidation cycles.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 RESULTS ============ -->
+<section id="results" class="alt">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="sec-head"><span class="no">06</span><h2>Results</h2></div>
+      <p class="lead">ALFWorld, WebShop, and WebArena. <b>EvoHarness-RL (Qwen3-8B)</b> vs. the strongest open-source baseline, SkillRL:</p>
+      <div class="wins">
+        <div class="win"><div class="l">ALFWorld Avg</div><div class="v">95.0</div><div class="c">vs. 85.0 &middot; <b>+10.0</b></div></div>
+        <div class="win"><div class="l">WebShop SR</div><div class="v">80.6</div><div class="c">vs. 73.2 &middot; <b>+7.4</b></div></div>
+        <div class="win"><div class="l">WebShop Score</div><div class="v">90.8</div><div class="c">vs. 85.5 &middot; <b>+5.3</b></div></div>
+        <div class="win"><div class="l">WebArena Avg</div><div class="v">26.0</div><div class="c">vs. 18.0 &middot; <b>+8.0</b></div></div>
+        <div class="win"><div class="l">&Delta; vs. ReAct</div><div class="v">+43.9</div><div class="c">vs. +36.3 &middot; <b>+7.6</b></div></div>
+      </div>
+    </div>
+
+    <div class="reveal">
+      <div class="rtitle">Main results</div>
+      <div class="tablewrap"><table class="res" id="main-table"></table></div>
+      <p class="tcap">Success rates (%). <span class="frozen">&lowast;</span> frozen,
+        <img src="static/emoji_fire.png" alt="trainable" style="height:13px;vertical-align:-2px"> trainable;
+        <b style="color:var(--blue)">blue</b> = column best per backbone; shaded rows = ours; &Delta; averages the four aggregate-metric gains over paired ReAct;
+        &dagger; ALFWorld/WebShop numbers transcribed from SkillOS.</p>
+    </div>
+
+    <div class="two-col reveal" style="margin-top:6px; align-items:start">
+      <div>
+        <div class="rtitle" style="margin-top:8px">Unseen ALFWorld tasks</div>
+        <div class="tablewrap"><table class="res" id="unseen-table"></table></div>
+        <p class="tcap">EvoHarness-RL keeps <b>94.8%</b> &mdash; +22.2% relative over SFT + GRPO, close to seen-split performance.</p>
+      </div>
+      <div>
+        <div class="rtitle" style="margin-top:8px">Ablations (ALFWorld Avg)</div>
+        <div class="chart" id="abl-chart"></div>
+        <p class="tcap">Dashed line = full EvoHarness-RL (95.0); &#9660; = drop when the component is removed. Axis starts at 40%.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BIBTEX ============ -->
+<section id="bibtex">
+  <div class="wrap reveal">
+    <div class="sec-head"><span class="no">07</span><h2>BibTeX</h2></div>
+    <div class="bib">
+      <button class="copy" id="copy-bib">Copy</button>
+<pre id="bib-text">@article{ning2026evoharness,
+  title   = {EvoHarness-RL: Learning Runtime Harness Coordination for Self-Evolving Agents},
+  author  = {Ning, Xuying and Fu, Dongqi and Wei, Tianxin and Zeng, Hanqing and Bei, Yuanchen and
+             Li, Bingxuan and Li, Zihao and Wang, Qifan and Shen, Xiang and Wu, Yifan and Liu, Jiayi and
+             Li, Hong and Xia, Yinglong and Fan, Xiangjun and Tong, Hanghang and He, Jingrui},
+  journal = {arXiv preprint},
+  year    = {2026}
+}</pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">University of Illinois Urbana-Champaign &middot; Meta AI &middot; 2026</div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
