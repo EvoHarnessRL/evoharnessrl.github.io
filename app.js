@@ -161,6 +161,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }), { rootMargin: "-40% 0px -55% 0px" });
   document.querySelectorAll("section[id]").forEach((s) => spy.observe(s));
 
+  setupMotion();
+
   const btn = document.getElementById("copy-bib");
   btn.addEventListener("click", async () => {
     await navigator.clipboard.writeText(document.getElementById("bib-text").textContent);
@@ -168,6 +170,141 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => (btn.textContent = "Copy"), 1600);
   });
 });
+
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function onceVisible(el, fn, threshold = 0.3) {
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (e.isIntersecting) { io.disconnect(); fn(); }
+  }), { threshold });
+  io.observe(el);
+}
+
+function countUp(el) {
+  const m = el.textContent.trim().match(/^([+\-−]?)(\d+(?:\.\d+)?)(\D*)$/);
+  if (!m || REDUCED) return;
+  const [, sign, num, tail] = m;
+  const target = parseFloat(num), dec = (num.split(".")[1] || "").length;
+  el.textContent = sign + (0).toFixed(dec) + tail;
+  onceVisible(el, () => {
+    const t0 = performance.now(), dur = 1300;
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = sign + (target * e).toFixed(dec) + tail;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, 0.6);
+}
+
+function setupTrace() {
+  const tr = document.getElementById("trace");
+  if (!tr || REDUCED) return;
+  const lines = [...tr.querySelectorAll(".ln")];
+  lines.forEach((l) => { if (l.querySelector(".k.bpe")) l.classList.add("bpe"); });
+  tr.classList.add("js");
+  let timers = [];
+  const play = () => {
+    timers.forEach(clearTimeout); timers = [];
+    lines.forEach((l) => l.classList.remove("on", "cur", "bpe-hit"));
+    tr.classList.add("playing");
+    let t = 250;
+    lines.forEach((l, i) => {
+      timers.push(setTimeout(() => {
+        lines.forEach((x) => x.classList.remove("cur"));
+        l.classList.add("on", "cur");
+        if (l.classList.contains("bpe")) l.classList.add("bpe-hit");
+        if (i === lines.length - 1) timers.push(setTimeout(() => { l.classList.remove("cur"); tr.classList.remove("playing"); }, 1400));
+      }, t));
+      t += l.querySelector(".ret") ? 650 : l.classList.contains("bpe") ? 520 : 420;
+    });
+  };
+  tr.querySelector(".replay").addEventListener("click", play);
+  onceVisible(tr, play, 0.5);
+}
+
+function setupLightbox() {
+  const box = document.createElement("div");
+  box.className = "lightbox";
+  box.innerHTML = '<img alt="">';
+  document.body.appendChild(box);
+  const img = box.querySelector("img");
+  const close = () => box.classList.remove("open");
+  document.querySelectorAll(".figure img").forEach((el) => el.addEventListener("click", () => {
+    img.src = el.src; img.alt = el.alt; box.classList.add("open");
+  }));
+  box.addEventListener("click", close);
+  addEventListener("keydown", (e) => e.key === "Escape" && close());
+}
+
+function setupLinked() {
+  document.querySelectorAll(".linked").forEach((root) => {
+    const items = [...root.querySelectorAll(".text [data-k]")];
+    const bands = [...root.querySelectorAll(".band[data-k]")];
+    const n = bands.length;
+    if (!n) return;
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "Hover an item to highlight it in the figure.";
+    root.querySelector(".text").appendChild(hint);
+
+    let cur = -1, timer = null, hovering = false, visible = false;
+    const activate = (k) => {
+      cur = k;
+      root.classList.toggle("has-active", k >= 0);
+      [...items, ...bands].forEach((el) => el.classList.toggle("active", +el.dataset.k === k));
+    };
+    const stop = () => { clearInterval(timer); timer = null; };
+    const start = () => {
+      if (REDUCED || timer || hovering || !visible) return;
+      timer = setInterval(() => activate((cur + 1) % n), 2600);
+    };
+    [...items, ...bands].forEach((el) => el.addEventListener("mouseenter", () => activate(+el.dataset.k)));
+    bands.forEach((b) => b.addEventListener("click", () => b.parentElement.querySelector("img").click()));
+    root.addEventListener("mouseenter", () => { hovering = true; stop(); });
+    root.addEventListener("mouseleave", () => { hovering = false; start(); });
+    new IntersectionObserver((es) => es.forEach((e) => {
+      visible = e.isIntersecting;
+      if (visible) { if (cur < 0) setTimeout(() => { if (!hovering) activate(0); start(); }, 1700); else start(); }
+      else stop();
+    }), { threshold: 0.35 }).observe(root);
+  });
+}
+
+function setupParallax() {
+  if (REDUCED) return;
+  const heads = [...document.querySelectorAll(".ana-head[data-n]")];
+  let ticking = false;
+  const upd = () => {
+    heads.forEach((h) => {
+      const r = h.getBoundingClientRect();
+      if (r.bottom > -200 && r.top < innerHeight + 200) h.style.setProperty("--py", ((r.top - innerHeight / 2) * -0.18).toFixed(1) + "px");
+    });
+    ticking = false;
+  };
+  addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(upd); } }, { passive: true });
+  upd();
+}
+
+function setupMotion() {
+  document.querySelectorAll(".stagger").forEach((g) => {
+    [...g.children].forEach((c, i) => c.style.setProperty("--i", i));
+    onceVisible(g, () => setTimeout(() => [...g.children].forEach((c) => c.style.setProperty("--i", 0)), 1600), 0.1);
+  });
+  document.querySelectorAll(".stat .k, .win .v, .kpi b").forEach(countUp);
+  setupTrace();
+  setupLightbox();
+  setupLinked();
+  setupParallax();
+
+  const bar = document.getElementById("progress");
+  const upd = () => {
+    const h = document.documentElement.scrollHeight - innerHeight;
+    bar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + "%";
+  };
+  addEventListener("scroll", upd, { passive: true });
+  upd();
+}
 
 addEventListener("load", () => {
   if (window.renderMathInElement) {
